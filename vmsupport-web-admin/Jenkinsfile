@@ -1,0 +1,79 @@
+def dockerImageName
+def dockerFilePath = '-f ./Dockerfile .'
+
+pipeline {
+    agent {
+        label 'slave-ubuntu'
+    }
+
+    environment {
+            GIT_BRANCH = "${params.branch}"
+            GIT_REPOSITORY = 'https://bitbucket.vietmap.vn/scm/glbs/tracking-web-admin.git'
+            REGISTRY_URL = 'vmapi/tracking-web-admin'
+            IMAGE_TAG = 'vmsupportv2.web'
+            VERSION = "1.0.0.1-${BUILD_NUMBER}"
+            K8S_DEPLOYMENT_NAME = 'vmsupport-web-admin'
+            K8S_SSH_INFO = 'admin@192.168.8.230'
+        }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git credentialsId: 'BITBUCKET_CREDENTIALS', url: "${GIT_REPOSITORY}", branch: "${GIT_BRANCH}"
+                    echo "Pull sourcode from branch: ${params.branch} success!"
+                }
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+
+                    echo "Build version: ${VERSION}"
+
+                    echo 'Remove old image if exits'
+                    sh "docker rmi -f ${IMAGE_TAG}.${VERSION}"
+
+                    echo 'Start build image'
+                    dockerImageName = "${IMAGE_TAG}.${VERSION}"
+                    sh "docker build ${dockerFilePath} -t ${dockerImageName}"
+
+                    echo 'Tag imei'
+                    sh "docker tag ${dockerImageName} ${REGISTRY_URL}:${dockerImageName}"
+
+                    echo 'Push imei to dockerhub'
+                    sh "docker push ${REGISTRY_URL}:${dockerImageName}"
+
+                    echo "Build image ${dockerImageName} success."
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sshagent(['ssh-k8s-testing']) {
+                    sh "ssh ${K8S_SSH_INFO} 'kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${REGISTRY_URL}:${dockerImageName}'"
+                }
+            }
+        }
+
+        stage('Clean build') {
+            steps {
+                script {
+                    echo 'Remove build image'
+                    sh "docker rmi -f ${IMAGE_TAG}.${VERSION}"
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo "Pipeline succeeded! Deployed successfully to branch ${params.branch}."
+        }
+        failure {
+            echo "Pipeline failed. Deployment aborted for branch ${params.branch}."
+        }
+    }
+}
