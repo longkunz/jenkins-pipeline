@@ -1,17 +1,29 @@
 pipeline {
     agent {
-        label 'windows'  // Specify a Windows node
+        label 'win-slave'  // Specify a Windows node
     }
 
     environment {
         PRJ = ''
         IMAGE_TAG = 'vietmap.tracking.adminservice'
-        VER = '1.0.0.31'
+        VER = '1.0.0.1-${BUILD_NUMBER}'
         RELEASE_FOLDER = ''
         REGISTRY_URL = 'vmapi/quanlyxe'
+        GIT_BRANCH = "${params.branch}"
+        GIT_REPOSITORY = 'https://bitbucket.vietmap.vn/scm/glbs/tracking-netcore-adminservice.git'
     }
 
     stages {
+        
+        stage('Checkout') {
+            steps {
+                script {
+                    git credentialsId: 'BITBUCKET_CREDENTIALS', url: "${GIT_REPOSITORY}", branch: "${GIT_BRANCH}"
+                    echo "Pull sourcode from branch: ${params.branch} success!"
+                }
+            }
+        }
+
         stage('Find Project Name') {
             steps {
                 bat(script: 'FOR %%i IN (*.csproj) DO SET PRJ=%%~ni', label: 'Find PRJ')
