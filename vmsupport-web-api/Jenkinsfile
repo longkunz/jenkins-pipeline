@@ -1,0 +1,49 @@
+pipeline {
+    agent {
+        label 'windows'  // Specify a Windows node
+    }
+
+    environment {
+        PRJ = ''
+        IMAGE_TAG = 'vietmap.tracking.adminservice'
+        VER = '1.0.0.31'
+        RELEASE_FOLDER = ''
+        REGISTRY_URL = 'vmapi/quanlyxe'
+    }
+
+    stages {
+        stage('Find Project Name') {
+            steps {
+                bat(script: 'FOR %%i IN (*.csproj) DO SET PRJ=%%~ni', label: 'Find PRJ')
+            }
+        }
+
+        stage('Publish .NET Core App') {
+            steps {
+                bat """
+                    set RELEASE_FOLDER=bin\\release\\%PRJ%
+                    rmdir /S /Q %RELEASE_FOLDER%
+                    mkdir %RELEASE_FOLDER%
+                    dotnet publish %PRJ%.csproj -c release -o .\\%RELEASE_FOLDER%\\app
+
+                    del %RELEASE_FOLDER%\\Dockerfile
+                    echo FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS runtime > %RELEASE_FOLDER%\\Dockerfile
+                    echo WORKDIR /app >> %RELEASE_FOLDER%\\Dockerfile
+                    echo COPY /app ./ >> %RELEASE_FOLDER%\\Dockerfile
+                    echo ENTRYPOINT [\\"]dotnet\\",\\"%PRJ%.dll\\"] >> %RELEASE_FOLDER%\\Dockerfile
+                """
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat """
+                    docker rmi -f %IMAGE_TAG%.%VER%
+                    docker build -f %RELEASE_FOLDER%\\Dockerfile -t %IMAGE_TAG%.%VER% %RELEASE_FOLDER%
+                    docker tag %IMAGE_TAG%.%VER% %REGISTRY_URL%:%IMAGE_TAG%.%VER%
+                    docker push %REGISTRY_URL%:%IMAGE_TAG%.%VER%
+                """
+            }
+        }
+    }
+}
