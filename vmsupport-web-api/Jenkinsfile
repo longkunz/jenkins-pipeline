@@ -34,10 +34,10 @@ pipeline {
         stage('Publish App') {
             steps {
                 bat """
-                    set $RELEASE_FOLDER=bin\\release\\$PRJ
-                    rmdir -Rf $RELEASE_FOLDER
-                    mkdir -p $RELEASE_FOLDER$
-                    dotnet publish $PRJ.csproj -c release -o .$RELEASE_FOLDER\\app
+                    set %RELEASE_FOLDER%=bin\\release\\%PRJ%
+                    rmdir -Rf %RELEASE_FOLDER%
+                    mkdir -p %RELEASE_FOLDER%
+                    dotnet publish %PRJ%.csproj -c release -o .%RELEASE_FOLDER%\\app
 
                     del %RELEASE_FOLDER%\\Dockerfile
                     echo FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS runtime > %RELEASE_FOLDER%\\Dockerfile
