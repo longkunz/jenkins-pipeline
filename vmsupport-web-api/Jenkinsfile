@@ -1,61 +1,20 @@
 pipeline {
-    agent {
-        label 'win-slave'  // Specify a Windows node
-    }
+    agent any
 
     environment {
-        PRJ = ''
-        IMAGE_TAG = 'vietmap.tracking.adminservice'
-        VER = '1.0.0.1-${BUILD_NUMBER}'
-        RELEASE_FOLDER = ''
+        K8S_DEPLOYMENT_NAME = 'admin-service'
+        K8S_SSH_INFO = 'admin@192.168.8.230'
         REGISTRY_URL = 'vmapi/quanlyxe'
-        GIT_BRANCH = "${params.branch}"
-        GIT_REPOSITORY = 'https://bitbucket.vietmap.vn/scm/glbs/tracking-netcore-adminservice.git'
+        IMAGE_TAG = 'vietmap.tracking.adminservice'
+        VERSION = "1.0.0.${params.buildNumber}"
     }
 
-    stages {
-        
-        stage('Checkout') {
+    stages {      
+        stage('Deploy') {
             steps {
-                script {
-                    git credentialsId: 'BITBUCKET_CREDENTIALS', url: "${GIT_REPOSITORY}", branch: "${GIT_BRANCH}"
-                    echo "Pull sourcode from branch: ${params.branch} success!"
+                sshagent(['ssh-k8s-testing']) {
+                    sh "ssh ${K8S_SSH_INFO} 'kubectl set image deployment/${K8S_DEPLOYMENT_NAME} ${K8S_DEPLOYMENT_NAME}=${REGISTRY_URL}:${IMAGE_TAG}.${VERSION}'"
                 }
-            }
-        }
-
-        stage('Find Project') {
-            steps {
-                bat(script: 'FOR %%i IN (*.csproj) DO SET PRJ=%%~ni', label: 'Find PRJ')
-                echo "Project name is: ${PRJ}"
-            }
-        }
-
-        stage('Publish App') {
-            steps {
-                bat """
-                    set %RELEASE_FOLDER%=bin\\release\\%PRJ%
-                    rmdir /S /Q %RELEASE_FOLDER%
-                    mkdir  %RELEASE_FOLDER%
-                    dotnet publish %PRJ%.csproj -c release -o .%RELEASE_FOLDER%\\app
-
-                    del %RELEASE_FOLDER%\\Dockerfile
-                    echo FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS runtime > %RELEASE_FOLDER%\\Dockerfile
-                    echo WORKDIR /app >> %RELEASE_FOLDER%\\Dockerfile
-                    echo COPY /app ./ >> %RELEASE_FOLDER%\\Dockerfile
-                    echo ENTRYPOINT [\\"]dotnet\\",\\"%PRJ%.dll\\"] >> %RELEASE_FOLDER%\\Dockerfile
-                """
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                bat """
-                    docker rmi -f %IMAGE_TAG%.%VER%
-                    docker build -f %RELEASE_FOLDER%\\Dockerfile -t %IMAGE_TAG%.%VER% %RELEASE_FOLDER%
-                    docker tag %IMAGE_TAG%.%VER% %REGISTRY_URL%:%IMAGE_TAG%.%VER%
-                    docker push %REGISTRY_URL%:%IMAGE_TAG%.%VER%
-                """
             }
         }
     }
