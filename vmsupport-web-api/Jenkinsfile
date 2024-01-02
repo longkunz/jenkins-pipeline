@@ -35,8 +35,8 @@ pipeline {
             steps {
                 bat """
                     set %RELEASE_FOLDER%=bin\\release\\%PRJ%
-                    rmdir -Rf %RELEASE_FOLDER%
-                    mkdir -p %RELEASE_FOLDER%
+                    rmdir /S /Q %RELEASE_FOLDER%
+                    mkdir  %RELEASE_FOLDER%
                     dotnet publish %PRJ%.csproj -c release -o .%RELEASE_FOLDER%\\app
 
                     del %RELEASE_FOLDER%\\Dockerfile
