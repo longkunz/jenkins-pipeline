@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'slave-ubuntu'
+    }
 
     environment {
         K8S_DEPLOYMENT_NAME = 'admin-service'
